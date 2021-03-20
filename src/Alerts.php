@@ -5,6 +5,7 @@ namespace GuillaumePeres\Alerts;
 use Illuminate\Session\Store as Session;
 use Illuminate\Config\Repository as Config;
 use \BadMethodCallException;
+use \InvalidArgumentException;
 
 class Alerts 
 {
@@ -33,14 +34,49 @@ class Alerts
     }
 
     /**
-    * Deletes all messages.
+    * Stores the given alert message into the session.
     *
-    * @return GuillaumePeres\Alerts\Alerts
+    * @param string
+    * @param string
+    */
+    public function add(string $level, string $alert)
+    {
+        if (!in_array($level, $this->getLevels())) {
+            throw new InvalidArgumentException("Unknown level [$level].");
+        }
+
+        $key = $this->getSessionKey();
+        $alerts = $this->session->pull($key, array());
+        $alerts[$level][] = $alert;
+        $this->session->put($key, $alerts);
+    }
+
+    public function pull(string $level)
+    {
+        if (!in_array($level, $this->getLevels())) {
+            throw new InvalidArgumentException("Unknown level [$level].");
+        }
+
+        $output = array();
+        $key = $this->getSessionKey();
+        $alerts = $this->session->pull($key, array());
+
+        if (isset($alerts[$level]) && is_array($alerts[$level])) {
+            $output = $alerts[$level];
+            unset($alerts[$level]);
+        }
+
+        $this->session->put($key, $alerts);
+
+        return $output;
+    }
+
+    /**
+    * Deletes all messages.
     */
     public function flush()
     {
         $this->session->forget($this->getSessionKey());
-        return $this;
     }
 
     /**
@@ -50,15 +86,17 @@ class Alerts
     *
     * @return bool
     */
-    public function has($level = null)
+    public function has(string $level = null)
     {
         $alerts = $this->session->get($this->getSessionKey(), null);
+
         if (is_null($level) && is_array($alerts) && count($alerts) > 0) {
             return true;
         }
         if (!is_null($level) && is_array($alerts) && isset($alerts[$level]) && count($alerts[$level]) > 0) {
             return true;
         }
+
         return false;
     }
 
@@ -69,14 +107,13 @@ class Alerts
     *
     * @return int
     */
-    public function count($level = null)
+    public function count(string $level = null)
     {
         $alerts = $this->session->get($this->getSessionKey(), null);
 
         if (is_null($alerts) || !is_array($alerts)) {
             return 0;
         }
-
         if (is_null($level)) {
             $total = 0;
             foreach ($alerts as $type => $group) {
@@ -135,32 +172,6 @@ class Alerts
     }
 
     /**
-    * Stores the given alert message into the session.
-    *
-    * @param string
-    * @param string
-    */
-    public function add($type, $message)
-    {
-
-    }
-
-    public function first($type)
-    {
-
-    }
-
-    public function get($type)
-    {
-
-    }
-
-    public function all()
-    {
-
-    }
-
-    /**
     * Dynamically handle alert additions.
     *
     * @param string $method
@@ -170,6 +181,11 @@ class Alerts
     */
     public function __call($method, $arguments)
     {
+        if (in_array($method, $this->getLevels())) {
+            $this->add($method, $arguments[0]);
+            return;
+        }
 
+        throw new BadMethodCallException("Method [$method] does not exist.");
     }
 }

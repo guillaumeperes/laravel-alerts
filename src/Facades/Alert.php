@@ -1,6 +1,6 @@
 <?php
 
-namespace GuillaumePeres\Alerts\Facade;
+namespace GuillaumePeres\Alerts\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
